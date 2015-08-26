@@ -9,6 +9,15 @@ Three way to use kernel crypto API are used:
 * cryptodev API http://cryptodev-linux.org/
 * a kernel module
 
+# compile
+```Shell
+autoreconf --install
+
+./configure
+
+make
+```
+
 # AF_ALG
 
 The af_alg_test tool permit to test AES and MD5/SHA1.
@@ -27,6 +36,9 @@ and check the result with the same operation done by the openssl lib.
 * The bench mode will simply bench x times some operations.
 
 ## Usage:
+```Shell
 cryptodev_test test aes number_of_request
 
 cryptodev_test bench aes number_of_request
+```
+
