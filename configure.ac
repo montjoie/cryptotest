@@ -21,7 +21,7 @@ AC_CHECK_HEADERS([sys/time.h])
 
 AC_CHECK_LIB(crypto, EVP_DigestUpdate)
 
-WANT_AF_ALG=no
+WANT_AF_ALG=yes
 COMPILE_AF_ALG=no
 case "${WANT_AF_ALG}" in
 	yes)
@@ -46,6 +46,14 @@ case "${WANT_CRYPTODEV}" in
 	;;
 esac
 AM_CONDITIONAL([COMPILE_CRYPTODEV], [test x$COMPILE_CRYPTODEV = xtrue])
+case "${COMPILE_CRYPTODEV}" in
+	true)
+		[echo "cryptodev support is enabled"]
+	;;
+	*)
+		[echo "cryptodev support cannot be enabled"]
+	;;
+esac
 
 AC_CONFIG_FILES([
  Makefile
