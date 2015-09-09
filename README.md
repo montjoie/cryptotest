@@ -9,7 +9,7 @@ Three way to use kernel crypto API are used:
 * cryptodev API http://cryptodev-linux.org/
 * a kernel module
 
-# compile
+# installation
 ```Shell
 autoreconf --install
 
@@ -26,6 +26,10 @@ Two mode are proposed, test and bench.
 and check the result with the same operation done by the openssl lib.
 * The bench mode will simply bench x times some operations.
 
+## Usage:
+```Shell
+af_alg_test aes number_of_request
+```
 
 # cryptodev
 
@@ -40,5 +44,15 @@ and check the result with the same operation done by the openssl lib.
 cryptodev_test test aes number_of_request
 
 cryptodev_test bench aes number_of_request
+```
+
+# kernel
+
+The kernel module named cryptotest, check cbc(aes) using the crypto API.
+
+## Usage
+```Shell
+make
+insmod cryptotest.ko
 ```
 
