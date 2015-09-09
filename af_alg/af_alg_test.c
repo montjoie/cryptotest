@@ -35,8 +35,9 @@ static int debug;
 #define DATA_LEN (1024 * 1024 * 4)
 
 unsigned char *data;
-static unsigned char result[DATA_LEN];
+static unsigned char dst[DATA_LEN];
 static unsigned char openssl_result[DATA_LEN];
+static unsigned char ddst[DATA_LEN];
 
 /*============================================================================*/
 /*============================================================================*/
@@ -98,7 +99,11 @@ static int openssl_sha1(const unsigned char *buf, size_t off, size_t len)
 
 /*============================================================================*/
 /*============================================================================*/
-static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo, const unsigned char *key, const unsigned keylen, const unsigned char *iv)
+/* Use AF_ALG to perform an operation with algo 
+ * from buff to buff_dst
+ * both buffer needed to be at least len sized
+ * for cipher operation way need to be ALG_OP_ENCRYPT or ALG_OP_DECRYPT */
+static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo, const unsigned char *key, const unsigned keylen, const unsigned char *iv, unsigned char *buff_dst, int way)
 {
 	int opfd;
 	int tfmfd;
@@ -178,7 +183,7 @@ static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo
 		char cbuf[CMSG_SPACE(4) + CMSG_SPACE(20)] = {};
 		struct iovec iov;
 		struct af_alg_iv *aiv;
-		__u32 optype = ALG_OP_ENCRYPT;
+		__u32 optype = way;
 
 		if (debug > 0)
 			printf("DEBUG: Do AES len=%zd\n", len);
@@ -211,7 +216,7 @@ static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo
 			msg.msg_flags = 0;
 			/*iov.iov_len = len - sended;*/
 			if (debug > 0)
-				printf("DEBUG: Will send offset=%d len=%d total=%d\n", sended, iov.iov_len, len);
+				printf("DEBUG: Will send offset=%zd len=%zd total=%zd\n", sended, iov.iov_len, len);
 			msg.msg_iovlen = 0;
 			msg.msg_iov = &iov;
 			msg.msg_iovlen = 1;
@@ -219,16 +224,16 @@ static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo
 			sent = sendmsg(opfd, &msg, 0);
 
 			if (debug > 0)
-				printf("DEBUG: sendmsg ret=%d %x %s\n", sent, msg.msg_flags, strerror(errno));
+				printf("DEBUG: sendmsg ret=%zd %x %s\n", sent, msg.msg_flags, strerror(errno));
 
 			if (sent < 0) {
 				fprintf(stderr, "send error %s\n", strerror(errno));
 				err = sent;
 				goto test_end;
 			}
-			ret = read(opfd, result + sended, sent);
+			ret = read(opfd, buff_dst + sended, sent);
 			if (debug > 0)
-				printf("DEBUG: recv %d\n", ret);
+				printf("DEBUG: recv %zd\n", ret);
 			if (ret != sent) {
 				fprintf(stderr, "Did not receive the right amount of data\n");
 				err = -1;
@@ -236,7 +241,7 @@ static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo
 			}
 			sended += sent;
 			if (debug > 0)
-				printf("DEBUG: sended %d/%d\n", sended, len);
+				printf("DEBUG: sended %zd/%zd\n", sended, len);
 
 			/* do not update IV for following chunks */
 			msg.msg_controllen = 0;
@@ -247,7 +252,7 @@ static int af_alg_do(const unsigned char *buff, size_t off, size_t len, int algo
 
 toto:
 	if (debug > 0)
-		printf("DEBUG: send len=%zd off=%d\n", tosend, off);
+		printf("DEBUG: send len=%zd off=%zd\n", tosend, off);
 	ret = send(opfd, buf + off, tosend, MSG_MORE);
 	if (ret < 0) {
 		fprintf(stderr, "ERROR: send %s\n", strerror(errno));
@@ -255,7 +260,7 @@ toto:
 		goto test_end;
 	}
 	if (debug > 0)
-		printf("DEBUG: send %d %zd\n", ret, sended);
+		printf("DEBUG: send %zd %zd\n", ret, sended);
 	sended += ret;
 	if (sended < len) {
 		tosend -= ret;
@@ -263,15 +268,15 @@ toto:
 	}
 
 	if (debug > 0)
-		printf("DEBUG recv tgt=%zd\n", sizeof(result));
-	ret = read(opfd, result, sizeof(result));
+		printf("DEBUG recv tgt=%zd\n", sizeof(buff_dst));
+	ret = read(opfd, buff_dst, sizeof(buff_dst));
 	if (ret < 0) {
 		fprintf(stderr, "Error de read %s\n", strerror(errno));
 		err = ret;
 		goto test_end;
 	}
 	if (debug > 0)
-		printf("DEBUG: read %d\n", ret);
+		printf("DEBUG: read %zd\n", ret);
 
 test_end:
 	close(opfd);
@@ -283,7 +288,7 @@ test_end:
 /*============================================================================*/
 int do_check(const unsigned char *data, const size_t data_len) {
 	int i, j, ret;
-	unsigned const char key[16] =
+	unsigned char key[16] =
 		"\x06\xa9\x21\x40\x36\xb8\xa1\x5b"
 		"\x51\x2e\x03\xd5\x34\x12\x00\x06";
 	unsigned char iv[16] = 
@@ -294,12 +299,12 @@ int do_check(const unsigned char *data, const size_t data_len) {
 	/* checks current MD5 implementation */
 	printf("do_checktoto\n");
 	for (i = 0; i < 4096; i++) {
-		af_alg_do(data, 0, i, BENCH_MD5, NULL, 0, NULL);
+		af_alg_do(data, 0, i, BENCH_MD5, NULL, 0, NULL, dst, 0);
 		openssl_md5(data, 0, i);
 			ret = 0;
 		for (j = 0; j < MD5_DIGEST_LENGTH; j++) {
 			printf("do_checktoto\n");
-			if (result[j] != openssl_result[j])
+			if (dst[j] != openssl_result[j])
 				ret = 1;
 		}
 		if (ret == 0) {
@@ -312,12 +317,12 @@ int do_check(const unsigned char *data, const size_t data_len) {
 	return 0;
 	/* checks current SHA1 implementation */
 	for (i = 0; i < 4096; i++) {
-		af_alg_do(data, 0, i, BENCH_SHA1, NULL, 0, NULL);
+		af_alg_do(data, 0, i, BENCH_SHA1, NULL, 0, NULL, dst, 0);
 		openssl_sha1(data, 0, i);
 		ret = 0;
 		for (j = 0; j < SHA_DIGEST_LENGTH; j++) {
 			/*printf("%02x", result[j]);*/
-			if (result[j] != openssl_result[j])
+			if (dst[j] != openssl_result[j])
 				ret = 1;
 		}
 		if (ret == 0) {
@@ -330,17 +335,16 @@ int do_check(const unsigned char *data, const size_t data_len) {
 	}
 
 do_check_aes:
-	/* checks current AES implementation */
-	for (i = 65440; i < 48000 * 2; i+= 16) {
+	/* checks current AES implementation *//* 65540 */
+	for (i = 16; i < 48000 * 2; i+= 16) {
 		if ((i % 4096) == 0)
 			printf("INFO: len=%d\n", i);
 		/*memset(result, 0, DATA_LEN);*/
-		af_alg_do(data, 0, i, BENCH_AES, key, 16, iv);
+		af_alg_do(data, 0, i, BENCH_AES, key, 16, iv, dst, ALG_OP_ENCRYPT);
 		openssl_aes(data, 0, i, iv, key);
 		ret = -1;
 		for (j = 0; j < i && ret == -1; j++) {
-			/*printf("%02x", result[j]);*/
-			if (result[j] != openssl_result[j]) {
+			if (dst[j] != openssl_result[j]) {
 				ret = j;
 				break;
 			}
@@ -349,13 +353,37 @@ do_check_aes:
 			if (debug > 0)
 				printf("DEBUG: Check ok for AES test %d\n", i);
 		} else {
-			printf("Check failed for AES test %d at %d\n", i, ret);
+			printf("ERROR: Check failed for AES cipher test %d at %d\n", i, ret);
 			/* dump the data for easy match */
 			j = ret - 8;
 			if (ret < 8)
 				j = 0;
 			for (; j < i && j < ret + 8; j++) {
-				printf("%04d d=%02x r=%02x o=%02x\n", j, data[j], result[j], openssl_result[j]);
+				printf("%04d d=%02x r=%02x o=%02x\n", j, data[j], dst[j], openssl_result[j]);
+			}
+			return -1;
+		}
+		/* no check for decypher */
+		memset(ddst, 0x66, DATA_LEN);
+		af_alg_do(dst, 0, i, BENCH_AES, key, 16, iv, ddst, ALG_OP_DECRYPT);
+		ret = -1;
+		for (j = 0; j < i && ret == -1; j++) {
+			if (ddst[j] != data[j]) {
+				ret = j;
+				break;
+			}
+		}
+		if (ret < 0) {
+			if (debug > 0)
+				printf("DEBUG: Check ok for AES test %d\n", i);
+		} else {
+			printf("ERROR: Check failed for AES decypher test %d at %d\n", i, ret);
+			/* dump the data for easy match */
+			j = ret - 8;
+			if (ret < 8)
+				j = 0;
+			for (; j < i && j < ret + 8; j++) {
+				printf("%04d d=%02x r=%02x o=%02x\n", j, data[j], ddst[j], openssl_result[j]);
 			}
 			return -1;
 		}
@@ -375,23 +403,26 @@ int generate_benchdata(const char *fname, const int randomfd) {
 		return -1;
 	}
 
-	printf("INFO: Generating data\n");
-	fdata = open(fname, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+	printf("INFO: Generating data in %s\n", fname);
+	fdata = open(fname, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (fdata < 0) {
-		fprintf(stderr, "Cannot create %s: %s\n", fname, strerror(errno));
+		fprintf(stderr, "ERROR: Failed tod create %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
 	ret = read(randomfd, data, DATA_LEN);
 	if (ret < 0) {
-		fprintf(stderr, "ERRROR: read random %s\n", fname, strerror(errno));
+		fprintf(stderr, "ERROR: read random %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
 	ret = write(fdata, data, DATA_LEN);
 	if (ret < 0) {
-		fprintf(stderr, "ERRROR: writing to %s: %s\n", fname, strerror(errno));
+		fprintf(stderr, "ERROR: writing to %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
-	lseek(fdata, 0, SEEK_SET);
+	ret = lseek(fdata, 0, SEEK_SET);
+	if (ret < 0 ) {
+		fprintf(stderr, "ERROR: Failed to lseek %s\n", strerror(errno));
+	}
 	return fdata;
 }
 
@@ -412,12 +443,11 @@ int main(const int argc, const char *argv[])
 	int fdr = -1, err = 0;
 	int benched_algo;/* 0=MD5 1=SHA1 2=AES*/
 	char buf_result[8192];
-	const unsigned char key[16] =
+	unsigned char key[16] =
 		"\x06\xa9\x21\x40\x36\xb8\xa1\x5b"
 		"\x51\x2e\x03\xd5\x34\x12\x00\x06";
 	unsigned char iv[16] = 
-		"\x3d\xaf\xba\x42\x9d\x9e\xb4\x30"
-		"\xb4\x22\xda\x80\x2c\x9f\xac\x41";
+		"\x3d\xaf\xba\x42\x9d\x9e\xb4\x30\xb4\x22\xda\x80\x2c\x9f\xac\x41";
 
 	if (argc < 2) {
 		fprintf(stderr, "%s [md5|sha1|aes] [check|numberofrequest]\n", argv[0]);
@@ -461,7 +491,7 @@ int main(const int argc, const char *argv[])
 	}
 
 	if (nb_request == 0) {
-		debug = 1;
+		debug = 0;
 		do_check(data, 16);
 		goto bench_end;
 	}
@@ -518,11 +548,11 @@ int main(const int argc, const char *argv[])
 		if (rsize == 131072)
 			nb_request /= 10;
 		for (i = 0; i < nb_request; i++) {
-			af_alg_do(data, 0, rsize - less_size, benched_algo, key, 16, iv);
+			af_alg_do(data, 0, rsize - less_size, benched_algo, key, 16, iv, dst, ALG_OP_ENCRYPT);
 		}
 		gettimeofday(&now, NULL);
 		nb_usec = now.tv_usec + (now.tv_sec - begin.tv_sec) * 1000000 - begin.tv_usec;
-		printf("%s %f requests of %d in %fus (%fs) %fr/us %fr/ms %fr/s\n",
+		printf("%s %f requests of %zd in %fus (%fs) %fr/us %fr/ms %fr/s\n",
 				argv[1],
 				nb_request, rsize - less_size,
 				nb_usec, nb_usec / 1000000,
@@ -531,7 +561,7 @@ int main(const int argc, const char *argv[])
 				nb_request * 1000000 / nb_usec
 		      );
 		/*number of request;r/s*/
-		ret = snprintf(buf_result, sizeof(buf_result), "%d;%d;%d\n",
+		ret = snprintf(buf_result, sizeof(buf_result), "%zd;%d;%d\n",
 				rsize,
 				(int)nb_request, (int)(nb_request * 1000000 / nb_usec));
 		ret = write(fdr, buf_result, ret);
