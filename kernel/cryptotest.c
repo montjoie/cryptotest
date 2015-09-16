@@ -91,11 +91,12 @@ static void test_ablkcipher_cb(struct crypto_async_request *req, int error)
  * Then cipher the same buffer with the tested cipher
  * and then decrypt the dst buffer to test decypher
  *
+ * @way	0 for cipher, 1 for decypher
  */
 static int do_test_cipher(const char *algo, char *iv,
 	const unsigned char *key, const unsigned int key_size,
 	struct scatterlist *sgin, struct scatterlist *sgout,
-	unsigned int taille)
+	unsigned int taille, int way)
 {
 	struct crypto_ablkcipher *tfm;
 	struct ablkcipher_request *req;
@@ -135,7 +136,10 @@ static int do_test_cipher(const char *algo, char *iv,
 	ablkcipher_request_set_crypt(req, sgin, sgout, taille, iv);
 	init_completion(&result.completion);
 
-	ret = crypto_ablkcipher_encrypt(req);
+	if (way == 0)
+		ret = crypto_ablkcipher_encrypt(req);
+	else
+		ret = crypto_ablkcipher_decrypt(req);
 
 	/*ret = crypto_ablkcipher_decrypt(req);*/
 	switch (ret) {
@@ -295,9 +299,10 @@ static int __init cryptotest_init(void)
 	/*struct sg_mapping_iter m;
 	u8 *tmp8;*/
 	unsigned int data_len;
-	struct sglist *sgd = NULL;
-	struct sglist *sgr = NULL;
-	struct sglist *sgt = NULL;
+	struct sglist *sgd = NULL; /* plaintext */
+	struct sglist *sgr = NULL; /* ciphered by generic cipher */
+	struct sglist *sgt = NULL; /* ciphered by tested cipher */
+	struct sglist *sgtd = NULL; /* de-ciphered by tested cipher */
 
 	sgd = kzalloc(sizeof(*sgd), GFP_KERNEL);
 	if (!sgd) {
@@ -314,6 +319,11 @@ static int __init cryptotest_init(void)
 		err = -ENOMEM;
 		goto error_sgil;
 	}
+	sgtd = kzalloc(sizeof(*sgtd), GFP_KERNEL);
+	if (!sgtd) {
+		err = -ENOMEM;
+		goto error_sgil;
+	}
 
 	err = allocate_sglist(sgd, NB_SG, 0x11);
 	if (err != 0)
@@ -322,6 +332,9 @@ static int __init cryptotest_init(void)
 	if (err != 0)
 		goto error_sgil;
 	err = allocate_sglist(sgt, NB_SG, 0x33);
+	if (err != 0)
+		goto error_sgil;
+	err = allocate_sglist(sgtd, NB_SG, 0x44);
 	if (err != 0)
 		goto error_sgil;
 #define TEST_CIPHER
@@ -348,7 +361,7 @@ static int __init cryptotest_init(void)
 		for (i = 0; i < 16; i++)
 			iv[i] = iv1[i];
 		err = do_test_cipher("cbc(aes-generic)", iv, key1, 16,
-				     sgd->s, sgr->s, data_len);
+				     sgd->s, sgr->s, data_len, 0);
 		if (err) {
 			pr_err("%s ERROR: do_test_cipher %d\n", MODNAME, err);
 			goto test_cipher_end;
@@ -358,13 +371,26 @@ static int __init cryptotest_init(void)
 			iv[i] = iv1[i];
 		/*err = do_test_cipher("cbc-aes-sun4i-ss", iv, key1, 16,*/
 		err = do_test_cipher("cbc(aes)", iv, key1, 16,
-				     sgd->s, sgt->s, data_len);
+				     sgd->s, sgt->s, data_len, 0);
 		if (err) {
 			pr_err("%s ERROR: do_test_cipher %d\n", MODNAME, err);
 			goto test_cipher_end;
 		}
 
 		err = cryptotest_comp_sgs(sgr->s, sgt->s, data_len);
+		if (err)
+			goto test_cipher_end;
+		/* now decipher */
+		for (i = 0; i < 16; i++)
+			iv[i] = iv1[i];
+		err = do_test_cipher("cbc(aes)", iv, key1, 16,
+				     sgt->s, sgtd->s, data_len, 1);
+		if (err) {
+			pr_err("%s ERROR: do_test_cipher %d\n", MODNAME, err);
+			goto test_cipher_end;
+		}
+
+		err = cryptotest_comp_sgs(sgd->s, sgtd->s, data_len);
 		if (err)
 			goto test_cipher_end;
 	}
@@ -420,7 +446,6 @@ test_cipher_end:
 #endif /* TEST_HASH */
 
 error_sgil:
-
 	for (i = 0; i < NB_SG; i++) {
 		if (sgd)
 			kfree(sgd->suf[i]);
@@ -428,10 +453,13 @@ error_sgil:
 			kfree(sgr->suf[i]);
 		if (sgt)
 			kfree(sgt->suf[i]);
+		if (sgtd)
+			kfree(sgtd->suf[i]);
 	}
 	kfree(sgd);
 	kfree(sgr);
 	kfree(sgt);
+	kfree(sgtd);
 	return result;
 }
 
