@@ -21,6 +21,7 @@
 #define MODNAME "ciphertest"
 
 #define DEBUG
+#define TEST_HASH
 
 /* test algo and set hash result in result*/
 static int do_hash_test(const char *algo, u8 *result, int nbsg,
@@ -82,7 +83,7 @@ static void test_ablkcipher_cb(struct crypto_async_request *req, int error)
 		return;
 	result->err = error;
 	complete(&result->completion);
-	pr_info("%s Encryption finished successfully\n", MODNAME);
+	pr_debug("%s Encryption finished successfully\n", MODNAME);
 }
 
 /*
@@ -148,7 +149,7 @@ static int do_test_cipher(const char *algo, char *iv,
 		break;
 	case -EINPROGRESS:
 	case -EBUSY:
-		pr_info("%s: On wait\n", MODNAME);
+		pr_debug("%s: On wait\n", MODNAME);
 		ret = wait_for_completion_interruptible(&result.completion);
 		break;
 	default:
@@ -402,17 +403,17 @@ test_cipher_end:
 	for (bench_update = 0; bench_update < 120; bench_update++) {
 		pr_info("%s: up=%d\n", MODNAME, bench_update);
 		for (bench_adv = 0; bench_adv < NB_SG - 1; bench_adv++) {
-			err = do_test("md5-generic", hresult, bench_adv, sgi,
+			err = do_hash_test("md5-generic", hresult, bench_adv, sgd->s,
 				      bench_update);
 			if (err != 0)
-				goto error_sgi;
+				goto error_sgil;
 			/* copy the result in our reference result */
 			for (i = 0; i < MD5_DIGEST_SIZE; i++)
 				gresult[i] = hresult[i];
-			err = do_test("md5", hresult, bench_adv, sgi,
+			err = do_hash_test("md5", hresult, bench_adv, sgd->s,
 				      bench_update);
 			if (err != 0)
-				goto error_sgi;
+				goto error_sgil;
 			for (i = 0; i < MD5_DIGEST_SIZE; i++)
 				if (gresult[i] != hresult[i]) {
 					pr_err("%s: ERROR: md5 problem %d %d i=%d %02x vs %02x\n",
@@ -426,11 +427,11 @@ test_cipher_end:
 		}
 
 		for (bench_adv = 0; bench_adv < NB_SG - 1; bench_adv++) {
-			do_test("sha1-generic", hresult, bench_adv, sgi,
+			do_hash_test("sha1-generic", hresult, bench_adv, sgd->s,
 				bench_update);
 			for (i = 0; i < SHA1_DIGEST_SIZE; i++)
 				gresult[i] = hresult[i];
-			do_test("sha1", hresult, bench_adv, sgi, bench_update);
+			do_hash_test("sha1", hresult, bench_adv, sgd->s, bench_update);
 			for (i = 0; i < SHA1_DIGEST_SIZE; i++)
 				if (gresult[i] != hresult[i]) {
 					pr_err("%s ERROR: sha1 problem %d %d i=%d %02x vs %02x\n",
