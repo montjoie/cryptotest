@@ -28,7 +28,7 @@ and check the result with the same operation done by the openssl lib.
 
 ## Usage:
 ```Shell
-af_alg_test aes number_of_request
+af_alg_test [md5|sha1|aes] [check|number_of_request]
 ```
 
 # cryptodev
@@ -48,7 +48,7 @@ cryptodev_test bench aes number_of_request
 
 # kernel
 
-The kernel module named cryptotest, check cbc(aes) using the crypto API.
+The kernel module named cryptotest, check cbc(aes), md5, sha1 using the crypto API.
 
 ## Usage
 ```Shell
