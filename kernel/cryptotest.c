@@ -23,53 +23,6 @@
 #define DEBUG
 #define TEST_HASH
 
-/* test algo and set hash result in result*/
-static int do_hash_test(const char *algo, u8 *result, int nbsg,
-			struct scatterlist *sgs, int nb_up_max)
-{
-	int ret = 0;
-	int i;
-	struct crypto_ahash *tfm;
-	struct ahash_request *req;
-
-	tfm = crypto_alloc_ahash(algo, 0, 0);
-	if (IS_ERR(tfm)) {
-		ret = PTR_ERR(tfm);
-		pr_err("%s ERROR: cannot alloc %s: %d\n", MODNAME, algo, ret);
-		return ret;
-	}
-
-	req = ahash_request_alloc(tfm, GFP_KERNEL);
-	/* set the request to be done from sgi (len=nbsg) to hresult*/
-	ahash_request_set_crypt(req, sgs, result, nbsg);
-
-	ret = crypto_ahash_init(req);
-	if (ret != 0) {
-		pr_err("ERROR: crypto_ahash_init\n");
-		goto error_t_req;
-	}
-/*	pr_info("bench: init %s len=%d nbup=%d\n",
-	  crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm)), nbsg, nb_up_max);*/
-
-	for (i = 0; i < nb_up_max; i++) {
-		ret = crypto_ahash_update(req);
-		if (ret != 0) {
-			pr_err("ERROR: crypto_ahash_update %d\n", ret);
-			goto error_t_req;
-		}
-	}
-
-	ret = crypto_ahash_final(req);
-	if (ret != 0)
-		pr_err("ERROR: crypto_ahash_final\n");
-
-error_t_req:
-	ahash_request_free(req);
-/*error_t_hash:*/
-	crypto_free_ahash(tfm);
-	return ret;
-}
-
 struct tcrypt_result {
 	struct completion completion;
 	int err;
@@ -84,6 +37,79 @@ static void test_ablkcipher_cb(struct crypto_async_request *req, int error)
 	result->err = error;
 	complete(&result->completion);
 	pr_debug("%s Encryption finished successfully\n", MODNAME);
+}
+
+/* test algo and set hash result in result*/
+static int do_hash_test(const char *algo, u8 *result, int nbsg,
+			struct scatterlist *sgs, int nb_up_max)
+{
+	int ret = 0;
+	int i;
+	struct crypto_ahash *tfm;
+	struct ahash_request *req;
+	struct tcrypt_result tresult;
+
+	tfm = crypto_alloc_ahash(algo, 0, 0);
+	if (IS_ERR(tfm)) {
+		ret = PTR_ERR(tfm);
+		pr_err("%s ERROR: cannot alloc %s: %d\n", MODNAME, algo, ret);
+		return ret;
+	}
+
+	req = ahash_request_alloc(tfm, GFP_KERNEL);
+	if (!req)
+		goto error_t_hash;
+	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+					test_ablkcipher_cb, &tresult);
+
+
+	/* set the request to be done from sgi (len=nbsg) to hresult*/
+	ahash_request_set_crypt(req, sgs, result, nbsg);
+	init_completion(&tresult.completion);
+
+	ret = crypto_ahash_init(req);
+	if (ret != 0) {
+		pr_err("ERROR: crypto_ahash_init\n");
+		goto error_t_req;
+	}
+/*	pr_info("bench: init %s len=%d nbup=%d\n",
+	  crypto_tfm_alg_driver_name(crypto_ahash_tfm(tfm)), nbsg, nb_up_max);*/
+
+	for (i = 0; i < nb_up_max; i++) {
+		ret = crypto_ahash_update(req);
+		switch (ret) {
+		case 0:
+			pr_debug("%s: OK\n", MODNAME);
+			break;
+		case -EINPROGRESS:
+		case -EBUSY:
+			pr_debug("%s: On wait\n", MODNAME);
+			ret = wait_for_completion_interruptible(&tresult.completion);
+			break;
+		default:
+			pr_info("%s: DEFAULT\n", MODNAME);
+		}
+	}
+
+	ret = crypto_ahash_final(req);
+	switch (ret) {
+	case 0:
+		pr_debug("%s: OK\n", MODNAME);
+		break;
+	case -EINPROGRESS:
+	case -EBUSY:
+		pr_debug("%s: On wait\n", MODNAME);
+		ret = wait_for_completion_interruptible(&tresult.completion);
+		break;
+	default:
+		pr_info("%s: DEFAULT\n", MODNAME);
+	}
+
+error_t_req:
+	ahash_request_free(req);
+error_t_hash:
+	crypto_free_ahash(tfm);
+	return ret;
 }
 
 /*
