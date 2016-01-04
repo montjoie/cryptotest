@@ -26,6 +26,12 @@ Two mode are proposed, test and bench.
 and check the result with the same operation done by the openssl lib.
 * The bench mode will simply bench x times some operations.
 
+## Requirement
+You need to have the following options enabled.
+* CONFIG_CRYPTO_USER_API
+* CONFIG_CRYPTO_USER_API_HASH
+* CONFIG_CRYPTO_USER_API_SKCIPHER
+
 ## Usage:
 ```Shell
 af_alg_test [md5|sha1|aes] [check|number_of_request]
@@ -38,6 +44,9 @@ Two mode are proposed, test and bench.
 * The test mode will try to cipher data from 16 to 2097152 bytes
 and check the result with the same operation done by the openssl lib.
 * The bench mode will simply bench x times some operations.
+
+## Requirement
+You need to have the [cryptodev module](http://cryptodev-linux.org/)
 
 ## Usage:
 ```Shell
