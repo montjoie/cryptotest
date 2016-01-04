@@ -421,13 +421,13 @@ static int __init cryptotest_init(void)
 		if (err)
 			goto test_cipher_end;
 	}
-	pr_info("%s: End\n", MODNAME);
+	pr_info("%s: test_cipher End\n", MODNAME);
 test_cipher_end:
 #endif /* TEST_CIPHER*/
 
 #ifdef TEST_HASH
 	for (bench_update = 0; bench_update < 120; bench_update++) {
-		pr_info("%s: up=%d\n", MODNAME, bench_update);
+		pr_info("%s: test_hash update=%d\n", MODNAME, bench_update);
 		for (bench_adv = 0; bench_adv < NB_SG - 1; bench_adv++) {
 			err = do_hash_test("md5-generic", hresult, bench_adv, sgd->s,
 				      bench_update);
