@@ -65,3 +65,15 @@ make
 insmod cryptotest.ko
 ```
 
+# lukstest
+
+The lukstest tool goal is to test if cipher/decipher works via cryptsetup/dm-crupt.
+
+## Requirement
+You need to have the [cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) tool installed.
+
+## Usage
+```Shell
+./lukstest
+```
+
