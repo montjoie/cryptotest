@@ -103,6 +103,9 @@ do
 		dd if=/dev/urandom of=$LT_TEMPDIR/test_${size} bs=1 count=$size > /dev/null 2>/dev/null
 		GOOD_SHA1="`sha1sum $LT_TEMPDIR/test_${size} | cut -d\  -f1`"
 		mv $LT_TEMPDIR/test_${size} $LT_MOUNTPOINT/test_${size}
+		# sync and drop all caches for forcing read from image
+		sync
+		echo 3 > /proc/sys/vm/drop_caches
 		TEST_SHA1="`sha1sum $LT_MOUNTPOINT/test_${size} | cut -d\  -f1`"
 		if [ "$GOOD_SHA1" = "$TEST_SHA1" ];then
 			#echo "GOOD $numtest $size $GOOD_SHA1 $TEST_SHA1"
