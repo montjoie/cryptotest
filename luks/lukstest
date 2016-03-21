@@ -47,6 +47,11 @@ do
 		echo "Setting the number of pass to $LT_NUMPASS"
 		shift
 	;;
+	--clean)
+		umount $LT_MOUNTPOINT
+		cryptsetup luksClose $LT_MAPPER
+		exit 0
+	;;
 	*)
 		echo "ERROR: unknown argument $1"
 		exit 1
@@ -69,14 +74,14 @@ echo 'toto' > ${LT_IMG}.key
 
 VERB='--verbose'
 
-echo "DEBUG: Format"
+echo "DEBUG: LUKS Format"
 cryptsetup luksFormat $VERB -c aes-cbc-plain -h sha1 --key-file=${LT_IMG}.key --batch-mode $LT_IMG
 if [ $? -ne 0 ];then
 	echo "ERROR: Cannot luksFormat $LT_IMG"
 	exit 1
 fi
 
-echo "DEBUG: open"
+echo "DEBUG: LUKS open"
 cryptsetup luksOpen $VERB --key-file=${LT_IMG}.key --batch-mode $LT_IMG $LT_MAPPER
 if [ $? -ne 0 ];then
 	echo "ERROR: Cannot luksFormat $LT_IMG"
@@ -102,7 +107,7 @@ do
 	do
 		dd if=/dev/urandom of=$LT_TEMPDIR/test_${size} bs=1 count=$size > /dev/null 2>/dev/null
 		GOOD_SHA1="`sha1sum $LT_TEMPDIR/test_${size} | cut -d\  -f1`"
-		mv $LT_TEMPDIR/test_${size} $LT_MOUNTPOINT/test_${size}
+		cp $LT_TEMPDIR/test_${size} $LT_MOUNTPOINT/test_${size}
 		# sync and drop all caches for forcing read from image
 		sync
 		echo 3 > /proc/sys/vm/drop_caches
@@ -112,7 +117,9 @@ do
 			echo -n ""
 		else
 			echo "BAD $numtest $size $GOOD_SHA1 $TEST_SHA1"
+			exit 1
 		fi
+		rm $LT_TEMPDIR/test_${size}
 	#	rm $LT_MOUNTPOINT/test
 	done
 	echo "END $numtest / $LT_NUMPASS"
