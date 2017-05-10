@@ -64,7 +64,7 @@ if [ ! -d "$LT_MOUNTPOINT" ];then
 	exit 1
 fi
 
-echo "DEBUG: Generate image"
+echo "DEBUG: Generate image in $LT_IMG"
 dd if=/dev/zero of=$LT_IMG bs=4k count=40000 > /dev/null 2>/dev/null
 if [ $? -ne 0 ];then
 	exit 1
@@ -74,14 +74,14 @@ echo 'toto' > ${LT_IMG}.key
 
 VERB='--verbose'
 
-echo "DEBUG: LUKS Format"
+echo "DEBUG: LUKS Format $LT_IMG"
 cryptsetup luksFormat $VERB -c aes-cbc-plain -h sha1 --key-file=${LT_IMG}.key --batch-mode $LT_IMG
 if [ $? -ne 0 ];then
 	echo "ERROR: Cannot luksFormat $LT_IMG"
 	exit 1
 fi
 
-echo "DEBUG: LUKS open"
+echo "DEBUG: LUKS open $LT_IMG as $LT_MAPPER"
 cryptsetup luksOpen $VERB --key-file=${LT_IMG}.key --batch-mode $LT_IMG $LT_MAPPER
 if [ $? -ne 0 ];then
 	echo "ERROR: Cannot luksFormat $LT_IMG"
@@ -90,11 +90,13 @@ fi
 
 cryptsetup status /dev/mapper/$LT_MAPPER
 
-echo "DEBUG: mkfs"
+echo "DEBUG: mkfs /dev/mapper/$LT_MAPPER"
 mkfs.ext4 /dev/mapper/$LT_MAPPER > /dev/null
 if [ $? -ne 0 ];then
 	exit 1
 fi
+
+echo "DEBUG: mount/dev/mapper/$LT_MAPPER on $LT_MOUNTPOINT"
 mount /dev/mapper/$LT_MAPPER $LT_MOUNTPOINT
 if [ $? -ne 0 ];then
 	exit 1
