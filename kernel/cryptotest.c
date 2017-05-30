@@ -16,6 +16,7 @@
 #include <crypto/rng.h>
 #include <crypto/md5.h>
 #include <crypto/sha.h>
+#include <crypto/internal/skcipher.h>
 #include <linux/jiffies.h>
 
 #define MODNAME "ciphertest"
@@ -28,7 +29,7 @@ struct tcrypt_result {
 	int err;
 };
 
-static void test_ablkcipher_cb(struct crypto_async_request *req, int error)
+static void test_skcipher_cb(struct crypto_async_request *req, int error)
 {
 	struct tcrypt_result *result = req->data;
 
@@ -60,7 +61,7 @@ static int do_hash_test(const char *algo, u8 *result, int nbsg,
 	if (!req)
 		goto error_t_hash;
 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
-					test_ablkcipher_cb, &tresult);
+					test_skcipher_cb, &tresult);
 
 
 	/* set the request to be done from sgi (len=nbsg) to hresult*/
@@ -125,50 +126,50 @@ static int do_test_cipher(const char *algo, char *iv,
 	struct scatterlist *sgin, struct scatterlist *sgout,
 	unsigned int taille, int way)
 {
-	struct crypto_ablkcipher *tfm;
-	struct ablkcipher_request *req;
+	struct crypto_skcipher *tfm;
+	struct skcipher_request *req;
 	int ret;
 	struct tcrypt_result result;
 
-	tfm = crypto_alloc_ablkcipher(algo, 0, 0);
+	tfm = crypto_alloc_skcipher(algo, 0, 0);
 	if (IS_ERR(tfm)) {
 		ret = PTR_ERR(tfm);
 		pr_err("ERROR: cannot alloc %s: %d\n", algo, ret);
 		return ret;
 	}
 
-	req = ablkcipher_request_alloc(tfm, GFP_KERNEL);
+	req = skcipher_request_alloc(tfm, GFP_KERNEL);
 	if (IS_ERR(req)) {
-		pr_err("ERROR: ablkcipher_request_alloc\n");
+		pr_err("ERROR: skcipher_request_alloc\n");
 		ret = PTR_ERR(req);
 		goto error_tfm;
 	}
 
-	ablkcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
-					test_ablkcipher_cb, &result);
+	skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+					test_skcipher_cb, &result);
 
 	pr_debug("%s: Testing: %s len=%u\n", MODNAME,
-		 crypto_tfm_alg_driver_name(crypto_ablkcipher_tfm(tfm)),
+		 crypto_tfm_alg_driver_name(crypto_skcipher_tfm(tfm)),
 		 taille);
 
-	ret = crypto_ablkcipher_setkey(tfm, key, key_size);
+	ret = crypto_skcipher_setkey(tfm, key, key_size);
 	if (ret != 0) {
-		pr_err("ERROR: crypto_ablkcipher_setkey\n");
+		pr_err("ERROR: crypto_skcipher_setkey\n");
 		goto error_req;
 	}
 
-	pr_debug("%s: IV %d %zd\n", MODNAME, crypto_ablkcipher_ivsize(tfm),
+	pr_debug("%s: IV %d %zd\n", MODNAME, crypto_skcipher_ivsize(tfm),
 		 strlen(iv));
 
-	ablkcipher_request_set_crypt(req, sgin, sgout, taille, iv);
+	skcipher_request_set_crypt(req, sgin, sgout, taille, iv);
 	init_completion(&result.completion);
 
 	if (way == 0)
-		ret = crypto_ablkcipher_encrypt(req);
+		ret = crypto_skcipher_encrypt(req);
 	else
-		ret = crypto_ablkcipher_decrypt(req);
+		ret = crypto_skcipher_decrypt(req);
 
-	/*ret = crypto_ablkcipher_decrypt(req);*/
+	/*ret = crypto_skcipher_decrypt(req);*/
 	switch (ret) {
 	case 0:
 		pr_debug("%s: OK\n", MODNAME);
@@ -183,9 +184,9 @@ static int do_test_cipher(const char *algo, char *iv,
 	}
 
 error_req:
-	ablkcipher_request_free(req);
+	skcipher_request_free(req);
 error_tfm:
-	crypto_free_ablkcipher(tfm);
+	crypto_free_skcipher(tfm);
 	return ret;
 }
 
