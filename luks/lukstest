@@ -6,6 +6,9 @@ LT_TEMPDIR='/dev/shm/'
 LT_MAPPER='ctest'
 LT_NUMPASS=10
 LT_VERBOSE=0
+LT_MODE="bench"
+LT_SECTORSIZE=4096
+LT_ALGO=aes-xts-plain64
 
 print_help() {
 	echo "$0 [--numpass npass][--tempdir path][--mountpoint path][--image path]"
@@ -38,7 +41,7 @@ do
 	--image)
 		shift
 		LT_IMG=$1
-		echo "Setting the image path to $LT_NUMPASS"
+		echo "Setting the image path to $LT_IMG"
 		shift
 	;;
 	--numpass)
@@ -51,6 +54,16 @@ do
 		umount $LT_MOUNTPOINT
 		cryptsetup luksClose $LT_MAPPER
 		exit 0
+	;;
+	--mode)
+		shift
+		LT_MODE="$1"
+		shift
+	;;
+	--algo)
+		shift
+		LT_ALGO="$1"
+		shift
 	;;
 	*)
 		echo "ERROR: unknown argument $1"
@@ -75,7 +88,7 @@ echo 'toto' > ${LT_IMG}.key
 VERB='--verbose'
 
 echo "DEBUG: LUKS Format $LT_IMG"
-cryptsetup luksFormat $VERB -c aes-cbc-plain -h sha1 --key-file=${LT_IMG}.key --batch-mode $LT_IMG
+cryptsetup luksFormat $VERB --type luks2 -c $LT_ALGO --sector-size=$LT_SECTORSIZE --pbkdf pbkdf2 -h sha256 --key-file=${LT_IMG}.key --batch-mode $LT_IMG
 if [ $? -ne 0 ];then
 	echo "ERROR: Cannot luksFormat $LT_IMG"
 	exit 1
@@ -102,6 +115,7 @@ if [ $? -ne 0 ];then
 	exit 1
 fi
 
+do_test() {
 for numtest in `seq 1 $LT_NUMPASS`
 do
 #for size in 5 10 50 64 100 128 500 512 1000 4192 8192 16384 32000 64000 131072 262144 524288 1048576
@@ -126,6 +140,28 @@ do
 	done
 	echo "END $numtest / $LT_NUMPASS"
 done
+}
+
+do_bench()
+{
+	for numtest in `seq 1 $LT_NUMPASS`
+	do
+		time dd if=/dev/zero of=$LT_MOUNTPOINT/test oflag=sync bs=4096 count=20000 >/dev/null
+		rm $LT_MOUNTPOINT/test
+	done
+}
+
+case $LT_MODE in
+bench)
+	do_bench
+;;
+test)
+	do_test
+;;
+*)
+	echo "ERROR: unknow mode"
+;;
+esac
 
 echo "DEBUG: umount"
 umount $LT_MOUNTPOINT
