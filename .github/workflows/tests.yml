@@ -1,0 +1,115 @@
+---
+# yamllint disable rule:line-length
+name: Build and tests
+
+on:  # yamllint disable-line rule:truthy
+  push:
+  pull_request:
+
+jobs:
+  build-bullseye:
+    runs-on: bullseye
+    name: build on bullseye
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo apt-get -y install autotools-dev build-essential automake libssl-dev
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+  build-bookworm:
+    runs-on: bookworm
+    name: build on bookworm
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo apt-get -y install autotools-dev build-essential automake libssl-dev
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    name: build on ubuntu
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo apt-get -y install autotools-dev build-essential automake
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+  build-centos7:
+    runs-on: centos7
+    name: build on RPM/centos7
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo yum -y install autoconf automake gcc make openssl-devel
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+      - name: run binary
+        run: ./af_alg/af_alg_test md5 1
+  build-rockylinux-8:
+    runs-on: rockylinux8
+    name: build on RPM/rockylinux8
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo yum -y install autoconf automake gcc make openssl-devel
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+  build-rockylinux-9:
+    runs-on: rockylinux9
+    name: build on RPM/rockylinux9
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo yum -y install autoconf automake gcc make openssl-devel
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+  build-fedora-38:
+    runs-on: fedora38
+    name: build on RPM/fedora38
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo yum -y install autoconf automake gcc make openssl-devel
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
+  build-fedora-39:
+    runs-on: fedora38
+    name: build on RPM/fedora39
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install packages
+        run: sudo yum -y install autoconf automake gcc make openssl-devel
+      - name: autorecon
+        run: autoreconf --install
+      - name: configure
+        run: ./configure
+      - name: build
+        run: make
