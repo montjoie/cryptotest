@@ -13,46 +13,58 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo apt-get -y install autotools-dev build-essential automake libssl-dev
+        run: sudo apt-get -y install autotools-dev build-essential automake libssl-dev linux-source python3 libelf-dev linux-base linux-image-generic
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
-      - name: build
+      - name: build the main programs
         run: make
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        run: cd kernel && make KDIR=/usr/src/linux
   build-bookworm:
     runs-on: bookworm
     name: build on bookworm
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo apt-get -y install autotools-dev build-essential automake libssl-dev
+        run: sudo apt-get -y install autotools-dev build-essential automake libssl-dev linux-source python3 libelf-dev linux-base linux-image-generic
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
       - name: build
         run: make
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        run: cd kernel && make KDIR=/usr/src/linux
   build-ubuntu:
     runs-on: ubuntu-latest
     name: build on ubuntu
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo apt-get -y install autotools-dev build-essential automake
+        run: sudo apt-get -y install autotools-dev build-essential automake linux-source
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
       - name: build
         run: make
+      - name: debug
+        run: dpkg -l |grep linux
+      - name: build the kernel modules
+        run: cd kernel && make
   build-centos7:
     runs-on: centos7
     name: build on RPM/centos7
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo yum -y install autoconf automake gcc make openssl-devel
+        run: sudo yum -y install autoconf automake gcc make openssl-devel kernel-devel
       - name: autorecon
         run: autoreconf --install
       - name: configure
@@ -61,55 +73,76 @@ jobs:
         run: make
       - name: run binary
         run: ./af_alg/af_alg_test md5 1
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        run: cd kernel && make KDIR=/usr/src/linux
   build-rockylinux-8:
     runs-on: rockylinux8
     name: build on RPM/rockylinux8
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo yum -y install autoconf automake gcc make openssl-devel
+        run: sudo yum -y install autoconf automake gcc make openssl-devel kernel-devel
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
       - name: build
         run: make
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        run: cd kernel && make KDIR=/usr/src/linux
   build-rockylinux-9:
     runs-on: rockylinux9
     name: build on RPM/rockylinux9
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo yum -y install autoconf automake gcc make openssl-devel
+        run: sudo yum -y install autoconf automake gcc make openssl-devel kernel-devel
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
       - name: build
         run: make
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        #run: cd kernel && make KDIR=/lib/modules/$(ls /lib/modules/)/build
+        run: cd kernel && make KDIR=/usr/src/linux
   build-fedora-38:
     runs-on: fedora38
     name: build on RPM/fedora38
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo yum -y install autoconf automake gcc make openssl-devel
+        run: sudo yum -y install autoconf automake gcc make openssl-devel kernel-devel
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
       - name: build
         run: make
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        run: cd kernel && make KDIR=/usr/src/linux
   build-fedora-39:
     runs-on: fedora38
     name: build on RPM/fedora39
     steps:
       - uses: actions/checkout@v2
       - name: Install packages
-        run: sudo yum -y install autoconf automake gcc make openssl-devel
+        run: sudo yum -y install autoconf automake gcc make openssl-devel kernel-devel
       - name: autorecon
         run: autoreconf --install
       - name: configure
         run: ./configure
       - name: build
         run: make
+      - name: setup the linux sources
+        run: sudo sh .github/workflows/linux-source.sh
+      - name: build the kernel modules
+        run: cd kernel && make KDIR=/usr/src/linux
