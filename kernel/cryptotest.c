@@ -13,9 +13,14 @@
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/version.h>
 #include <crypto/rng.h>
 #include <crypto/md5.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0))
+#include <crypto/sha1.h>
+#else
 #include <crypto/sha.h>
+#endif
 #include <crypto/internal/skcipher.h>
 #include <linux/jiffies.h>
 
